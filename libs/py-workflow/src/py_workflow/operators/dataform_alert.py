@@ -1,0 +1,2 @@
+class DataformAlertTrigger:
+    pass

@@ -1,14 +1,17 @@
-from google.cloud import bigquery
+import os
 
+from google.cloud import bigquery
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2 import service_account
-import os
-from tsdatalake_workflow.operators.base import BaseOperator
-from tsdatalake_utils.common.logger import LoggerMixing
+from py_workflow.operators.base import BaseOperator
+from py_utils.common.logger import LoggerMixin
 
-class BigqueryToDriveOperator(BaseOperator, LoggerMixing):
-    def __init__(self, project_id, dataset_id, table_id, destination_folder_id, credentials_path):
+
+class BigqueryToDriveOperator(BaseOperator, LoggerMixin):
+    def __init__(
+        self, project_id, dataset_id, table_id, destination_folder_id, credentials_path
+    ):
         self.project_id = project_id
         self.dataset_id = dataset_id
         self.table_id = table_id
@@ -20,10 +23,9 @@ class BigqueryToDriveOperator(BaseOperator, LoggerMixing):
 
         # Initialize Google Drive service
         credentials = service_account.Credentials.from_service_account_file(
-            credentials_path,
-            scopes=['https://www.googleapis.com/auth/drive']
+            credentials_path, scopes=["https://www.googleapis.com/auth/drive"]
         )
-        self.drive_service = build('drive', 'v3', credentials=credentials)
+        self.drive_service = build("drive", "v3", credentials=credentials)
 
     def export_table_to_gcs(self, bucket_name, destination_blob_name):
         destination_uri = f"gs://{bucket_name}/{destination_blob_name}.csv"
@@ -33,23 +35,26 @@ class BigqueryToDriveOperator(BaseOperator, LoggerMixing):
         extract_job = self.bq_client.extract_table(
             table_ref,
             destination_uri,
-            location="US"  # Location must match that of the source table.
+            location="US",  # Location must match that of the source table.
         )
         extract_job.result()  # Wait for the job to complete.
 
-        print(f"Exported {self.project_id}:{self.dataset_id}.{self.table_id} to {destination_uri}")
+        print(
+            f"Exported {self.project_id}:{self.dataset_id}.{self.table_id} to {destination_uri}"
+        )
         return destination_uri
 
     def upload_to_drive(self, file_path, file_name):
-        file_metadata = {
-            'name': file_name,
-            'parents': [self.destination_folder_id]
-        }
-        media = MediaFileUpload(file_path, mimetype='text/csv')
+        file_metadata = {"name": file_name, "parents": [self.destination_folder_id]}
+        media = MediaFileUpload(file_path, mimetype="text/csv")
 
-        file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        file = (
+            self.drive_service.files()
+            .create(body=file_metadata, media_body=media, fields="id")
+            .execute()
+        )
         print(f"File ID: {file.get('id')}")
-        return file.get('id')
+        return file.get("id")
 
     def execute(self, bucket_name, destination_blob_name, file_name):
         # Export table to Google Cloud Storage
@@ -65,6 +70,7 @@ class BigqueryToDriveOperator(BaseOperator, LoggerMixing):
         os.remove(file_name)
 
         return file_id
+
 
 # Example usage:
 # operator = BigqueryToDriveOperator(
